@@ -25,7 +25,7 @@ jobs:
             - node_modules
           key: v1-dependencies-{{ checksum "package.json" }}
   
-  deploy_to_sandbox:
+  deploy_to_sbx:
     docker:
       - image: google/cloud-sdk
     environment:
@@ -37,17 +37,17 @@ jobs:
     steps:
       - checkout
       - set_project
-      - run:
-          name: Authorize GCloud Command Line Tool
-          command: |
-            echo ${cideployer} > ${HOME}/gcloud-service-key.json
-            gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
-            gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
-      - run:
-         name: Install libzip-dev
-         command: |
-            apt-get install -y libzip-dev
-            apt-get install -y zip
+      # - run:
+      #     name: Authorize GCloud Command Line Tool
+      #     command: |
+      #       echo ${cideployer} > ${HOME}/gcloud-service-key.json
+      #       gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+      #       gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
+      # - run:
+      #    name: Install libzip-dev
+      #    command: |
+      #       apt-get install -y libzip-dev
+      #       apt-get install -y zip
       - run:
          name: Creating function zip file
          command: |
