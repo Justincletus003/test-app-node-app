@@ -1,0 +1,149 @@
+version: 2.1
+
+commands:
+  # Command to set project
+  set_project:
+    steps:
+      - run: |
+          apt-get install -qq -y gettext
+jobs:
+  build_and_test:
+    docker:
+      - image: circleci/node:latest
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "package.json" }}
+            - v1-dependencies-
+      - run:
+          name: Install dependencies
+          command: npm install
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package.json" }}
+  
+  deploy_to_sandbox:
+    docker:
+      - image: google/cloud-sdk
+    environment:
+      PROJECT_NAME: "node-lighthouse-worker"
+      GOOGLE_PROJECT_ID: "pantheon-lighthouse"
+      FUNCTION_NAME: lighthouse-worker-sbx
+      BUCKNAME: "lighthouse-worker-sbx"
+      TOPICS_NAME: "launch-lighthouse-worker-sbx"
+    steps:
+      - checkout
+      - set_project
+      - run:
+          name: Authorize GCloud Command Line Tool
+          command: |
+            echo ${cideployer} > ${HOME}/gcloud-service-key.json
+            gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+            gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
+      - run:
+         name: Install libzip-dev
+         command: |
+            apt-get install -y libzip-dev
+            apt-get install -y zip
+      - run:
+         name: Creating function zip file
+         command: |
+            pwd
+            ls -l
+
+      # zip --filesync -r9 ${PROJECT_NAME}.zip .
+      # - run:
+      #    name: Upload zip file to GCS
+      #    command: |
+      #     gsutil cp ${PROJECT_NAME}.zip gs://${BUCKNAME}/${PROJECT_NAME}.zip
+      
+      # - run:
+      #     name: Deploy To Google Cloud Functions
+      #     command: |
+      #       # Deploy command
+      #       gcloud functions deploy "${FUNCTION_NAME}" \
+      #         --trigger-topic ${TOPICS_NAME} \
+      #         --memory 2048 \
+      #         --timeout 540 \
+      #         --runtime=nodejs16 \
+      #         --set-secrets '/config/settings.json=poc-lighthouse-worker-secret-sbx:latest'
+  
+  deploy_to_prod:
+    docker:
+      - image: google/cloud-sdk
+    environment:
+      PROJECT_NAME: "node-lighthouse-worker"
+      GOOGLE_PROJECT_ID: "pantheon-lighthouse"
+      FUNCTION_NAME: lighthouse-worker-prod
+      BUCKNAME: "lighthouse-worker-prod"
+      TOPICS_NAME: "launch-lighthouse-worker-prod"
+    steps:
+      - checkout
+      - set_project
+      - run:
+          name: Authorize GCloud Command Line Tool
+          command: |
+            echo ${cideployer} > ${HOME}/gcloud-service-key.json
+            gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
+            gcloud --quiet config set project ${GOOGLE_PROJECT_ID}
+      - run:
+         name: Install libzip-dev
+         command: |
+          apt-get install -y libzip-dev
+          apt-get install -y zip
+      - run:
+         name: Creating function zip file
+         command: |
+          zip --filesync -r9 ${PROJECT_NAME}.zip .
+      - run:
+         name: Upload zip file to GCS
+         command: |
+          gsutil cp ${PROJECT_NAME}.zip gs://${BUCKNAME}/${PROJECT_NAME}.zip
+      
+      - run:
+          name: Deploy To Google Cloud Functions
+          command: |
+            # Deploy command
+            gcloud functions deploy "${FUNCTION_NAME}" \
+              --trigger-topic ${TOPICS_NAME} \
+              --memory 2048 \
+              --timeout 540 \
+              --runtime=nodejs16 \
+              --set-secrets '/config/settings.json=poc-lighthouse-worker-secret-prod:latest'
+  
+workflows:
+  version: 2
+  build_and_deploy:
+    jobs:
+      - build_and_test
+      - hold_sbx_deployment:
+          type: approval
+          filters:
+            branches:
+              only:
+                - main
+      - deploy_to_sbx:
+          requires:
+            - hold_sbx_deployment
+          filters:
+            branches:
+              only:
+                - main
+      - hold_prod_deployment:
+          type: approval
+          requires:
+            - deploy_to_sbx
+          filters:
+            branches:
+              only:
+                - main
+      - deploy_to_prod:
+          requires:
+            - hold_prod_deployment
+          filters:
+            branches:
+              only:
+                - main

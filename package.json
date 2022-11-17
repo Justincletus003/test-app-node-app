@@ -1,0 +1,19 @@
+{
+  "name": "test-app-node-app",
+  "version": "1.0.0",
+  "description": "ci-cd test",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Justincletus003/test-app-node-app.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Justincletus003/test-app-node-app/issues"
+  },
+  "homepage": "https://github.com/Justincletus003/test-app-node-app#readme"
+}
